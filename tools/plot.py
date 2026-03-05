@@ -1,8 +1,10 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
+
+
 # Charger le fichier Excel
-data = pd.read_excel("data.xlsx")
+data = pd.read_csv("../data/traj.csv")
 
 # Colonnes
 x = data["x"]

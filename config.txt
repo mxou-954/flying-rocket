@@ -1,0 +1,15 @@
+missile_x 1
+missile_y 1
+missile_z 1
+target_x 300
+target_y 25
+target_z 0
+Thit 5.0
+dt 0.01
+T 30
+output_file ../data/traj.csv
+mass 10
+drag 0.05
+apex 200
+fuel 100
+thrust 50000
