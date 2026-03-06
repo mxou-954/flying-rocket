@@ -9,6 +9,8 @@ struct Missile {
     double fuel; 
     double thrust; 
     bool engineOn; 
+    double burn_rate;
+    double guidance;
 };
 
 struct ArrivalPoint { 

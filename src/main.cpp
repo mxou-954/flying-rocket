@@ -41,6 +41,8 @@ int main() {
                 if(key == "apex") apex = value;
                 if(key == "fuel") m.fuel = value;
                 if(key == "thrust") m.thrust = value;
+                if(key == "burn_rate") m.burn_rate = value;
+                if(key == "guidance") m.guidance = value;
             }
         config.close();
     } else {
