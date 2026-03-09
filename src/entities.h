@@ -5,12 +5,13 @@
 struct Missile { 
     Vec3 pos, vel; 
     double mass; 
-    double drag; 
     double fuel; 
     double thrust; 
     bool engineOn; 
     double burn_rate;
-    double guidance;
+    double max_angle_deg;
+    double cd;
+    double area;
 };
 
 struct ArrivalPoint { 

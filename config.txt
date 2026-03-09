@@ -9,9 +9,10 @@ dt 0.01
 T 400
 output_file ../data/traj.csv
 mass 302
-drag 0.3
 apex 10000
 fuel 100
-thrust 70000
+thrust 80000
 burn_rate 4
-guidance 1000
+max_angle_deg 5
+drag_cd 0.3
+drag_area 0.05
