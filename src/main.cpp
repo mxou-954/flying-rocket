@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <cmath>
+#include <stdlib.h>
 
 #include "Vec3.h"
 #include "simulation.h"
@@ -37,12 +38,13 @@ int main() {
                 if(key == "dt") dt = value;
                 if(key == "T") T = value;
                 if(key == "mass") m.mass = value;
-                if(key == "drag") m.drag = value;
+                if(key == "drag_cd") m.cd = value;
+                if(key == "drag_area") m.area = value;
                 if(key == "apex") apex = value;
                 if(key == "fuel") m.fuel = value;
                 if(key == "thrust") m.thrust = value;
                 if(key == "burn_rate") m.burn_rate = value;
-                if(key == "guidance") m.guidance = value;
+                if(key == "max_angle_deg") m.max_angle_deg = value;
             }
         config.close();
     } else {

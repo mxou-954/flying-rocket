@@ -2,6 +2,12 @@
 
 #include "simulation.h"
 
+double airDensity(double altitude) {
+    const double rho0 = 1.225;
+    const double H = 8500.0;
+    return rho0 * std::exp(-altitude / H);
+}
+
 void runSimulation(
     Missile& m, 
     ArrivalPoint& target, 
@@ -18,10 +24,8 @@ void runSimulation(
     Thit = 2.0 * std::sqrt(2.0 * apex / g);
     std::cout << "Thit " << Thit << " secondes.\n";
 
-    m.vel = Vec3(0, 0, 3);
-
     std::ofstream out(outputPath);
-    out << "t,x,y,z,speed\n";
+    out << "t,x,y,z,speed,x_theory,y_theory,z_theory,a_thrust_x,a_thrust_y,a_thrust_z\n";
 
     double t = 0.0;
     double engineSetOff = 0.0;
@@ -29,33 +33,50 @@ void runSimulation(
     m.engineOn = true;
     double initial_dist = length(target.pos - m.pos);
     Vec3 start_pos = m.pos;
+    Vec3 wind = Vec3(0, 0, 0);
+
+    double vx0 = (target.pos.x - start_pos.x) / Thit;
+    double vy0 = (target.pos.y - start_pos.y) / Thit;
+    double vz0 = apex * 4.0 / Thit; // dérivée de z_theory à t=0
+    m.vel = Vec3(vx0, vy0, vz0);
 
     for(; t <= T; t += dt) {
 
-        if((m.fuel <= 0) && m.engineOn) {
+        double wind_speed = ((double)rand() / RAND_MAX) * 15.0; // 0-15 m/s
+        double wind_angle = ((double)rand() / RAND_MAX) * 2 * M_PI; // direction horizontale
+        Vec3 wind = Vec3(
+            wind_speed * cos(wind_angle),
+            wind_speed * sin(wind_angle),
+            0.0  // pas de vent vertical
+        );
+
+        if((m.fuel <= 0.5) && m.engineOn) {
             m.engineOn = false;
             engineSetOff = t;
             positionEngineOff = m.pos;
         }
 
         double z_theory = apex * 4.0 * (t / Thit) * (1.0 - t / Thit);
-        double ratio = t / Thit;
+        double ratio = std::min(t / Thit, 1.0);
         Vec3 pos_theory = Vec3(
             start_pos.x + (target.pos.x - start_pos.x) * ratio,
             start_pos.y + (target.pos.y - start_pos.y) * ratio,
             z_theory
         );
 
-        double speed = length(m.vel);
-        out << t << "," << m.pos.x << "," << m.pos.y << "," << m.pos.z
-            << "," << speed << "\n";
-
         Vec3 a_thrust = Vec3(0, 0, 0);
         if(m.engineOn) {
-            a_thrust = Vec3(0, 0, m.thrust / m.mass);
-            m.fuel -= m.burn_rate * dt;
-            m.mass -= m.burn_rate * dt;
+            double z_error = pos_theory.z - m.pos.z;  // écart vertical uniquement
+            double thrust_factor = std::min(std::max(z_error / 500.0, 0.0), 1.0);
+            a_thrust = Vec3(0, 0, m.thrust * thrust_factor / m.mass);
+            m.fuel -= m.burn_rate * thrust_factor * dt;
+            m.mass -= m.burn_rate * thrust_factor * dt;
         }
+        
+        double speed = length(m.vel);
+        out << t << "," << m.pos.x << "," << m.pos.y << "," << m.pos.z
+            << "," << speed << "," << pos_theory.x << "," << pos_theory.y << "," << pos_theory.z << "," 
+            << a_thrust.x << "," << a_thrust.y << "," << a_thrust.z << "\n";
 
         // La trainée c'est a résistance de l'air calculé 
         // k = m.drag
@@ -66,20 +87,28 @@ void runSimulation(
         // F_drag = -k * vel
         // a_drag = F_drag / mass = -k * vel / mass
         
-        Vec3 drag = m.vel * (-m.drag / m.mass); // m/s^2
+        double rho = airDensity(m.pos.z);
+        double speed_relative = length(m.vel - wind);       // vitesse relative à l'air
+        Vec3 vel_relative_dir = (m.vel - wind) * (1.0 / speed_relative);
+        Vec3 drag = vel_relative_dir * (-0.5 * rho * m.cd * m.area * speed_relative * speed_relative / m.mass);
         Vec3 a = gravity + drag + a_thrust; // m/s^2
 
-        if(t <= Thit) {
-            // Phase montée : corriger vers la position théorique sur la parabole
-            Vec3 correction = pos_theory - m.pos;
-            m.vel += correction * m.guidance * dt;
-        } else {
-            // Phase descente : pointer vers la cible
-            Vec3 to_target = target.pos - m.pos;
-            double dist = length(to_target);
-            Vec3 guidance_dir = to_target * (1.0 / dist);
-            double guidance_factor = m.guidance * (dist / initial_dist);
-            m.vel += guidance_dir * guidance_factor * dt;
+        double dz_theory = apex * 4.0 / Thit * (1.0 - 2.0 * t / Thit); // dérivée de z_theory
+        double dx_theory = (target.pos.x - start_pos.x) / Thit;
+        double dy_theory = (target.pos.y - start_pos.y) / Thit;
+        Vec3 vel_theory = Vec3(dx_theory, dy_theory, dz_theory);
+
+        Vec3 pos_error = pos_theory - m.pos;
+        Vec3 vel_error = vel_theory - m.vel;
+        Vec3 correction = pos_error * 1.0 + vel_error * 1.2;
+        double correction_len = length(correction);
+
+        if(correction_len > 0) {
+            Vec3 correction_dir = correction * (1.0 / correction_len);
+            double max_angle_rad = m.max_angle_deg * M_PI / 180.0;
+            double max_correction = length(m.vel) * std::tan(max_angle_rad);
+            double correction_magnitude = std::min(correction_len, max_correction);
+            m.vel += correction_dir * correction_magnitude * dt;
         }
 
         // Symplectic Euler integration
