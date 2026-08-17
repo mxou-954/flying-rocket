@@ -1,63 +1,28 @@
 #include <iostream>
-#include <fstream>
-#include <cmath>
-#include <stdlib.h>
+#include <string>
 
-#include "Vec3.h"
+#include "config.h"
 #include "simulation.h"
 #include "entities.h"
 
-using namespace std;
+int main(int argc, char** argv)
+{
+    // Chemin de config : argv[1] si fourni, sinon config.txt du répertoire courant.
+    const std::string configPath = (argc > 1) ? argv[1] : "config.txt";
 
-int main() {
-    ifstream config("../config.txt");
-    string line;
-
-    double Thit = 0;
-    double T = 0;
-    double dt = 0;
-    double apex = 0;
-    string output_file = "";
-
-    Missile m;
-    ArrivalPoint target;
-
-    if(config.is_open()){
-            string key;
-            string strValue;
-            while(config >> key >> strValue) {
-                if(key == "output_file") { output_file = strValue; continue; }
-                double value = stod(strValue);
-                if(key == "missile_x") m.pos.x = value;
-                if(key == "missile_y") m.pos.y = value;
-                if(key == "missile_z") m.pos.z = value;
-                if(key == "target_x") target.pos.x = value;
-                if(key == "target_y") target.pos.y = value;
-                if(key == "target_z") target.pos.z = value;
-                if(key == "Thit") Thit = value;
-                if(key == "dt") dt = value;
-                if(key == "T") T = value;
-                if(key == "mass") m.mass = value;
-                if(key == "drag_cd") m.cd = value;
-                if(key == "drag_area") m.area = value;
-                if(key == "apex") apex = value;
-                if(key == "fuel") m.fuel = value;
-                if(key == "thrust") m.thrust = value;
-                if(key == "burn_rate") m.burn_rate = value;
-                if(key == "max_angle_deg") m.max_angle_deg = value;
-            }
-        config.close();
-    } else {
-        cout << "Erreur : Impossible de lire le fichier." << endl;
+    SimulationConfig cfg;
+    std::string err;
+    if (!loadConfig(configPath, cfg, err)) {
+        std::cerr << "Erreur de configuration : " << err << "\n";
+        return 1;
     }
 
-    runSimulation(
-        m, 
-        target, 
-        dt, 
-        T, 
-        Thit, 
-        output_file, 
-        apex
-    );
+    Missile m = makeMissile(cfg);
+    ArrivalPoint target;
+    target.pos = cfg.target_pos;
+
+    if (!runSimulation(m, target, cfg)) {
+        return 1;
+    }
+    return 0;
 }

@@ -5,7 +5,15 @@
 
 #include "simulation.h"
 
+#include <iostream>
+#include <iomanip>
+#include <fstream>
+#include <cmath>
+#include <random>
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 double speedOfSound(double altitude) {
     // Modèle atmosphère standard ISA
@@ -37,11 +45,16 @@ double airDensity(double altitude)
 // ------------------------------------------------------------
 
 /// Tire un vecteur vent horizontal aléatoire (0–15 m/s, direction quelconque).
+/// Le générateur est seedé explicitement : deux exécutions avec la même
+/// graine produisent exactement la même trajectoire.
 /// @return  Vec3 vent en m/s (composante z nulle)
-static Vec3 randomWind()
+static Vec3 randomWind(unsigned int seed)
 {
-    double speed = ((double)rand() / RAND_MAX) * 15.0;          // m/s
-    double angle = ((double)rand() / RAND_MAX) * 2.0 * M_PI;   // radians
+    std::mt19937 rng(seed);
+    std::uniform_real_distribution<double> u01(0.0, 1.0);
+
+    double speed = u01(rng) * 15.0;          // m/s
+    double angle = u01(rng) * 2.0 * M_PI;    // radians
     return Vec3(speed * std::cos(angle),
                 speed * std::sin(angle),
                 0.0);
@@ -56,7 +69,7 @@ static Vec3 randomWind()
 /// @param apex  Altitude maximale souhaitée (m)
 /// @param g     Accélération gravitationnelle (m/s²)
 /// @return      Temps de vol total (s)
-static double computeFlightTime(double apex, double g)
+double computeFlightTime(double apex, double g)
 {
     return 2.0 * std::sqrt(2.0 * apex / g);
 }
@@ -143,23 +156,21 @@ static Vec3 applyGuidance(Missile& m,
 //  Boucle principale de simulation
 // ------------------------------------------------------------
 
-void runSimulation(
-    Missile&           m,
-    ArrivalPoint&      target,
-    double             dt,
-    double             T,
-    double             Thit,      // recalculé en interne
-    const std::string& outputPath,
-    double             apex
-)
+bool runSimulation(Missile& m, ArrivalPoint& target, const SimulationConfig& cfg,
+                   bool verbose)
 {
+    const double dt   = cfg.dt;
+    const double T    = cfg.T;
+    const double apex = cfg.apex;
+
     // -- Constantes physiques --
     const double g       = 9.81;
     const Vec3   gravity = Vec3(0.0, 0.0, -g);
 
     // -- Temps de vol théorique (trajectoire parabolique symétrique) --
-    Thit = computeFlightTime(apex, g);
-    std::cout << "Thit = " << Thit << " s\n";
+    //    Valeur dérivée de l'apex : elle n'est pas un paramètre de configuration.
+    const double Thit = computeFlightTime(apex, g);
+    if (verbose) std::cout << "Thit = " << Thit << " s\n";
 
     // -- Conditions initiales --
     const Vec3 start_pos = m.pos;
@@ -168,18 +179,24 @@ void runSimulation(
     // Vitesse initiale alignée sur la trajectoire théorique
     m.vel = theoreticalVelocity(start_pos, target.pos, apex, 0.0, Thit);
 
-    // -- Vent (tiré une seule fois pour toute la simulation) --
-    const Vec3 wind = randomWind();
+    // -- Vent (tiré une seule fois pour toute la simulation, graine fixée) --
+    const Vec3 wind = randomWind(cfg.seed);
 
     // -- Journalisation --
-    std::ofstream out(outputPath);
+    std::ofstream out(cfg.output_file);
+    if (!out.is_open()) {
+        std::cerr << "Erreur : impossible d'ecrire le fichier de sortie : "
+                  << cfg.output_file << "\n";
+        return false;
+    }
+    out << std::setprecision(10);
     out << "t,x,y,z,speed,"
         << "x_theory,y_theory,z_theory,"
         << "a_thrust_x,a_thrust_y,a_thrust_z,"
         << "rho,drag_x,drag_y,drag_z,"
         << "kinetic_energy,pos_error,"
         << "correction_x,correction_y,correction_z,"
-        << "mach,";
+        << "mach\n";
 
     // -- Variables d'état moteur (pour le rapport final) --
     double engineSetOff       = 0.0;
@@ -274,6 +291,9 @@ void runSimulation(
     // --------------------------------------------------------
     Vec3 delta = m.pos - target.pos;
 
+    if (!verbose) return true;
+
+    std::cout << std::setprecision(10);
     std::cout << "\n=== Rapport de simulation ===\n";
     std::cout << "Durée totale               : " << t              << " s\n";
     std::cout << "Position finale missile    : ("
@@ -288,4 +308,6 @@ void runSimulation(
               << positionEngineOff.z << ")\n";
     std::cout << "Carburant consommé         : "
               << (m.burn_rate * engineSetOff) << " kg\n";
+
+    return true;
 }
