@@ -5,7 +5,7 @@ missile_x 1
 missile_y 1
 missile_z 1
 
-target_x 55000
+target_x 30000
 target_y 15000
 target_z 0
 

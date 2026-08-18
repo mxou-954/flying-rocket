@@ -14,6 +14,6 @@ struct Vec3 {
     Vec3 operator*(double s) const { return Vec3(x*s, y*s, z*s); }
     Vec3& operator+=(const Vec3& o) { x+=o.x; y+=o.y; z+=o.z; return *this; }
 };
-inline double length(const Vec3& v) { return std::sqrt(v.x*v.x + v.y*v.y + v.z*v.z); }
+inline double length(const Vec3& v) { return std::sqrt(v.x*v.x + v.y*v.y + v.z*v.z); } /// norme euclidienne
 
 #endif

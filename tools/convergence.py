@@ -97,7 +97,7 @@ def main():
     print("dt        t_impact    x_impact       y_impact       ecart/ref (m)  ordre obs.")
     prev_err, prev_dt = None, None
     for dt, pos, t in results:
-        err = math.dist(pos, ref_pos)
+        err = math.dist(pos, ref_pos) # distance euclidienne point 2d
         order = ""
         if prev_err and err > 0:
             order = "%.2f" % (math.log(prev_err / err) / math.log(prev_dt / dt))
